@@ -1,10 +1,138 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Gestión de Almacén";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<style>
+    /* Estilos profesionales para el Dashboard de Inventario */
+    body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .dashboard-header { border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; color: #2c3e50; }
+    .dashboard-container { display: flex; gap: 25px; align-items: flex-start; }
+
+    /* Panel izquierdo: Formulario */
+    .form-section { background: white; padding: 25px; border-radius: 8px; width: 30%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 4px solid #3498db; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; font-size: 0.9em; text-transform: uppercase; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccd1d9; border-radius: 5px; box-sizing: border-box; }
+    .btn-submit { background-color: #2ecc71; color: white; padding: 12px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; font-size: 1em; }
+    .btn-submit:hover { background-color: #27ae60; }
+
+    /* Panel derecho: Tabla de datos */
+    .table-section { width: 70%; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e1e8ed; }
+    th { background-color: #2c3e50; color: white; font-weight: 600; text-transform: uppercase; font-size: 0.85em; }
+    tr:hover { background-color: #f8f9fa; }
+
+    /* Etiquetas y Alertas visuales */
+    .tag-categoria { padding: 4px 10px; border-radius: 12px; font-size: 0.85em; background: #ecf0f1; color: #2c3e50; font-weight: bold; }
+    .stock-critico { color: #e74c3c; font-weight: bold; background-color: #fadbd8; padding: 3px 8px; border-radius: 4px; }
+    .stock-ok { color: #27ae60; font-weight: bold; }
+    .alerta-sistema { padding: 10px; border-radius: 5px; margin-bottom: 20px; font-weight: bold; text-align: center; }
+</style>
+
+<h2 class="dashboard-header">📦 Sistema de Gestión de Almacén</h2>
+
+@if (!string.IsNullOrEmpty(Model.MensajeSistema))
+{
+    <div class="alerta-sistema" style="background-color: @(Model.MensajeSistema.Contains("Error") || Model.MensajeSistema.Contains("Falla") ? "#fadbd8" : "#d5f5e3"); color: @(Model.MensajeSistema.Contains("Error") || Model.MensajeSistema.Contains("Falla") ? "#c0392b" : "#1e8449");">
+        @Model.MensajeSistema
+    </div>
+}
+
+<div class="dashboard-container">
+    <!-- PANEL DE REGISTRO -->
+    <div class="form-section">
+        <h4 style="margin-top: 0; color: #2c3e50;">➕ Ingreso de Mercancía</h4>
+        <form method="post">
+            <!-- NOTA: Hemos eliminado el campo del SKU. Ahora C# lo hará solo. -->
+
+            <div class="form-group">
+                <label>Nombre del Producto:</label>
+                <input type="text" name="nombre" placeholder="Ej. Leche Entera 1L" required />
+            </div>
+            <div class="form-group">
+                <label>Categoría:</label>
+                <select name="categoria" required>
+                    <option value="">-- Seleccionar --</option>
+                    <option value="Lacteos">Lácteos</option>
+                    <option value="Abarrotes">Abarrotes</option>
+                    <option value="Frutas y Verduras">Frutas y Verduras</option>
+                    <option value="Limpieza">Limpieza</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Precio de Venta ($):</label>
+                <input type="number" name="precio" step="0.01" min="0" placeholder="0.00" required />
+            </div>
+            <div class="form-group">
+                <label>Existencia Inicial:</label>
+                <input type="number" name="existencia" min="0" placeholder="0" required />
+            </div>
+            <button type="submit" class="btn-submit">Registrar Producto</button>
+        </form>
+    </div>
+
+    <!-- PANEL DE INVENTARIO MULTI-TABLA -->
+    <div class="table-section">
+        <h4 style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">📊 Inventario por Categorías</h4>
+
+        @if (Model.Almacen.Count > 0)
+        {
+            // Creamos un arreglo con los nombres de las categorías que queremos dibujar
+            string[] categoriasFiltro = { "Abarrotes", "Lácteos", "Frutas y Verduras", "Limpieza" };
+
+            // Por cada categoría, creamos una tabla independiente
+            foreach (var nombreCat in categoriasFiltro)
+            {
+                // Extraemos de la lista general SÓLO los artículos de esta categoría
+                var productosDeEstaCategoria = Model.Almacen.Where(a => a.Categoria == nombreCat).ToList();
+
+                // Si hay al menos 1 producto en esta categoría, dibujamos su tabla
+                if (productosDeEstaCategoria.Count > 0)
+                {
+                    <h5 style="background-color: #ecf0f1; padding: 8px; color: #2c3e50; border-radius: 4px; margin-top: 20px;">
+                        🏷️ Sección: @nombreCat
+                    </h5>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU Auto-Generado</th>
+                                <th>Producto</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var articulo in productosDeEstaCategoria)
+                            {
+                                <tr>
+                                    <td style="font-family: monospace; color: #7f8c8d; font-weight: bold;">@articulo.SKU</td>
+                                    <td style="font-weight: bold; color: #34495e;">@articulo.Nombre</td>
+                                    <td>$@articulo.Precio.ToString("0.00")</td>
+                                    <td>
+                                        @if (articulo.Existencia <= 5)
+                                        {
+                                            <span class="stock-critico">@articulo.Existencia (Reabastecer)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="stock-ok">@articulo.Existencia</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        }
+        else
+        {
+            <div style="text-align: center; color: #7f8c8d; padding: 20px;">
+                El almacén está vacío. Registre un producto para comenzar.
+            </div>
+        }
+    </div>
 </div>
